@@ -1,0 +1,72 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Application load balancer template laboration
+Metadata: 
+
+Parameters: 
+
+Mappings: 
+
+Conditions: 
+
+Resources: 
+
+applicationLoadBalancerSecGrp:
+  Type: AWS::EC2::SecurityGroup
+  Properties:
+    GroupName: "ApplicationLoadBalancerSecGrp"
+    GroupDescription: "Security group for application load balancer"
+    SecurityGroupIngress:
+      - IpProtocol: [tcp|udp|ip]
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: [tcp|udp|ip]
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: [tcp|udp|ip]
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+
+MyTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      Port: 80
+      Protocol: HTTP
+      VpcId: !ImportValue 'aws:ec2:vpc:id'
+
+applicationLoadBalancer:
+  Type: AWS::ElasticLoadBalancing::LoadBalancer
+  Properties:
+    Name: "WordpressLoadBalancer"
+    Scheme: internet-facing
+    SecurityGroups:
+      - !GetAtt applicationLoadBalancerSecGrp.GroupId
+    # AvailabilityZones: [eu-west-1a, eu-west-1b, eu-west-1c]
+    SubnetMappings:
+      - Subnet: !Select [0, !GetAZs 'eu-west-1']
+      - Subnet: !Select [1, !GetAZs 'eu-west-1']
+      - Subnet: !Select [2, !GetAZs 'eu-west-1']
+    Listeners:
+      - LoadBalancerPort: 80
+        InstancePort: 80
+        Protocol: HTTP
+        InstanceProtocol: HTTPS
+      - LoadBalancerPort: '443'
+        InstancePort: '80'
+        Protocol: HTTPS
+        InstanceProtocol: HTTPS
+    HealthCheck:
+      Target: HTTP:80/
+      HealthyThreshold: 2
+      UnhealthyThreshold: 1
+      Interval: 30
+      Timeout: 5
+
+Outputs:
