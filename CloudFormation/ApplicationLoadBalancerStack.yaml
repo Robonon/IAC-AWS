@@ -1,0 +1,85 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Application load balancer template laboration
+
+Parameters:
+  ALBName:
+    Description: "Set app load balancer name"
+    Type: String
+    Default: ALB
+
+Resources: 
+
+  applicationLoadBalancerSecGrp:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref ALBName 
+      GroupDescription: "Open port 80 HTTPS for load balancer"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  loadBalancerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      Port: 80
+      Protocol: HTTP
+      VpcId: vpc-03a33e6a6982b9f67
+
+  applicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      IpAddressType: ipv4
+      Name: "WordpressLoadBalancer"
+      Scheme: "internet-facing"
+      SecurityGroups: 
+        - !GetAtt applicationLoadBalancerSecGrp.GroupId
+      SubnetMappings:
+        - SubnetId: subnet-074559faefce7f792
+        - SubnetId: subnet-050c3cc7e37d58444
+        - SubnetId: subnet-026b8575fca0c965a
+
+
+  launchTemplate:
+    Type: 'AWS::EC2::LaunchTemplate'
+    Properties:
+      LaunchTemplateName: template-for-asg
+      LaunchTemplateData:
+        SecurityGroupIds:
+          - !GetAtt applicationLoadBalancerSecGrp.GroupId
+        Placement:
+          Tenancy: dedicated
+        ImageId: ami-04f1014c8adcfa670
+        InstanceType: t2.micro
+        KeyName: DemoKey
+
+  autoScalingGrp:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties: 
+      AutoScalingGroupName: "autoScalingGrp"
+      AvailabilityZones: 
+        - eu-west-1a
+        - eu-west-1b
+        - eu-west-1c
+      CapacityRebalance: true
+      DefaultInstanceWarmup: 30
+      DesiredCapacity: "2"
+      HealthCheckGracePeriod: 30
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref launchTemplate
+        Version: !GetAtt launchTemplate.LatestVersionNumber
+      LoadBalancerNames: 
+        - !GetAtt loadBalancerTargetGroup.TargetGroupArn
+      MaxSize: "4"
+      MinSize: "1"
+      NewInstancesProtectedFromScaleIn: true
