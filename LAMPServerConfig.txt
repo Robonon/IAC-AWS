@@ -1,0 +1,4 @@
+dnf update -y
+dnf install -y httpd wget php-fpm php-mysqli php-json php php-devel
+systemctl start httpd
+systemctl enable httpd

@@ -3,17 +3,17 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Application load balancer template laboration
 
 Parameters:
-  ALBName:
+  ALBSecGrpName:
     Description: "Set app load balancer name"
     Type: String
-    Default: ALB
+    Default: ALBSecGrp
 
 Resources: 
 
-  applicationLoadBalancerSecGrp:
+  LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Ref ALBName 
+      GroupName: !Ref ALBSecGrpName 
       GroupDescription: "Open port 80 HTTPS for load balancer"
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -24,8 +24,65 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
+  
+  AutoScalingSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: AutoScalingSecurityGroup 
+      GroupDescription: "Open HTTPS from load balancer security group"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            !GetAtt LoadBalancerSecurityGroup.GroupId
+  
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: EFSSecurityGroup 
+      GroupDescription: "Open access to ESF for Autoscaling group"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId:
+            !GetAtt AutoScalingSecurityGroup.GroupId
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId:
+            !GetAtt ProvisionSecurityGroup.GroupId
 
-  loadBalancerTargetGroup:
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: RDSSecurityGroup 
+      GroupDescription: "Open access to RDS for Autoscaling group and Provisioning VM"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            !GetAtt AutoScalingSecurityGroup.GroupId
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            !GetAtt ProvisionSecurityGroup.GroupId
+
+  ProvisionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ProvisionSecurityGroup 
+      GroupDescription: "Open SSH access to Provisioning VM on port 22"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  AutoScalingTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckEnabled: true
@@ -36,32 +93,57 @@ Resources:
       Protocol: HTTP
       VpcId: vpc-03a33e6a6982b9f67
 
-  applicationLoadBalancer:
+  ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties: 
       IpAddressType: ipv4
       Name: "WordpressLoadBalancer"
       Scheme: "internet-facing"
       SecurityGroups: 
-        - !GetAtt applicationLoadBalancerSecGrp.GroupId
+        - !GetAtt LoadBalancerSecurityGroup.GroupId
       SubnetMappings:
         - SubnetId: subnet-074559faefce7f792
         - SubnetId: subnet-050c3cc7e37d58444
         - SubnetId: subnet-026b8575fca0c965a
 
+  ApplicationLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref AutoScalingTargetGroup
+  
+  myEC2Instance:
+      Type: AWS::EC2::Instance
+      Properties:
+        KeyName: HomeDesktopKey
+        ImageId: ami-04f1014c8adcfa670
+        InstanceType: t2.micro
+        SecurityGroupIds:
+          - !GetAtt ProvisionSecurityGroup.GroupId
+        UserData: !Base64 |
+          #!/bin/bash -ex
+          # put your script here
 
-  launchTemplate:
+  LaunchTemplate:
     Type: 'AWS::EC2::LaunchTemplate'
     Properties:
       LaunchTemplateName: template-for-asg
       LaunchTemplateData:
         SecurityGroupIds:
-          - !GetAtt applicationLoadBalancerSecGrp.GroupId
-        Placement:
-          Tenancy: dedicated
+          - !GetAtt AutoScalingSecurityGroup.GroupId
         ImageId: ami-04f1014c8adcfa670
         InstanceType: t2.micro
-        KeyName: DemoKey
+        UserData:
+          Fn::Base64: |
+            #!/bin/bash
+            dnf update -y
+            dnf install -y httpd wget php-fpm php-mysqli php-json php php-devel
+            systemctl start httpd
+            systemctl enable httpd
 
   autoScalingGrp:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -76,10 +158,13 @@ Resources:
       DesiredCapacity: "2"
       HealthCheckGracePeriod: 30
       LaunchTemplate: 
-        LaunchTemplateId: !Ref launchTemplate
-        Version: !GetAtt launchTemplate.LatestVersionNumber
-      LoadBalancerNames: 
-        - !GetAtt loadBalancerTargetGroup.TargetGroupArn
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      TargetGroupARNs: 
+        - !GetAtt AutoScalingTargetGroup.TargetGroupArn
       MaxSize: "4"
       MinSize: "1"
       NewInstancesProtectedFromScaleIn: true
+      
+
+      TODO Create EFS and RDS resources
