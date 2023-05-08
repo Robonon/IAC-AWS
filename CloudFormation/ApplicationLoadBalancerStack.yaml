@@ -207,53 +207,17 @@ Resources:
     Properties:
       FileSystemId: !Ref EFS
       RootDirectory: 
-        RootDirectory FIND OUT ROOT DIRECTORY?
-
-
-
-
-
-      TODO Create 'EFS' and RDS resources, Installing LAMP, look into wordpress tutorial
+        path: /var/www/html
 
     RDS:
       Type: AWS::RDS::DBInstance
       Properties: 
         AllocatedStorage: String
-        AllowMajorVersionUpgrade: Boolean
-        AssociatedRoles: 
-          - DBInstanceRole
-        AutoMinorVersionUpgrade: Boolean
-        AvailabilityZone: String
-        BackupRetentionPeriod: Integer
-        CACertificateIdentifier: String
-        CertificateDetails: 
-          CertificateDetails
-        CertificateRotationRestart: Boolean
-        CharacterSetName: String
-        CopyTagsToSnapshot: Boolean
-        CustomIAMInstanceProfile: String
-        DBClusterIdentifier: String
-        DBClusterSnapshotIdentifier: String
-        DBInstanceClass: String
-        DBInstanceIdentifier: String
-        DBName: String
-        DBParameterGroupName: String
-        DBSecurityGroups: 
-          - String
-        DBSnapshotIdentifier: String
-        DBSubnetGroupName: String
-        DeleteAutomatedBackups: Boolean
-        DeletionProtection: Boolean
-        Domain: String
-        DomainIAMRoleName: String
-        EnableCloudwatchLogsExports: 
-          - String
-        EnableIAMDatabaseAuthentication: Boolean
-        EnablePerformanceInsights: Boolean
+        DBName: wordpressDatabase
         Endpoint: 
           Endpoint
-        Engine: String
-        EngineVersion: String
+        Engine: mariadb
+        EngineVersion: MySQL 8.0
         Iops: Integer
         KmsKeyId: String
         LicenseModel: String
@@ -294,9 +258,8 @@ Resources:
         UseDefaultProcessorFeatures: Boolean
         UseLatestRestorableTime: Boolean
         VPCSecurityGroups: 
-          - String
-
+          - !Ref RDSSecurityGroup
       
-/var/www/html
-
+      efs path /var/www/html
+      TODO Create 'EFS' and RDS resources, Installing LAMP, look into wordpress tutorial
       install php on EFS
