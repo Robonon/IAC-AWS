@@ -165,6 +165,10 @@ Resources:
       MaxSize: "4"
       MinSize: "1"
       NewInstancesProtectedFromScaleIn: true
-      
 
+      
+      
+/var/www/html
       TODO Create EFS and RDS resources
+
+      install php on EFS
