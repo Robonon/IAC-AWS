@@ -116,7 +116,7 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref AutoScalingTargetGroup
   
-  myEC2Instance:
+  ProvisioningVM:
       Type: AWS::EC2::Instance
       Properties:
         KeyName: HomeDesktopKey
@@ -144,11 +144,17 @@ Resources:
             dnf install -y httpd wget php-fpm php-mysqli php-json php php-devel
             systemctl start httpd
             systemctl enable httpd
+            usermod -a -G apache ec2-user
+            chown -R ec2-user:apache /var/www
+            chmod 2775 /var/www && find /var/www -type d -exec sudo chmod 2775 {} \;
+            find /var/www -type f -exec sudo chmod 0664 {} \;
+            echo "<?php phpinfo(); ?>" > /var/www/html/phpinfo.php
+            yum install -y amazon-efs-utils
 
-  autoScalingGrp:
+  AutoScalingGrp:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties: 
-      AutoScalingGroupName: "autoScalingGrp"
+      AutoScalingGroupName: "AutoScalingGrp"
       AvailabilityZones: 
         - eu-west-1a
         - eu-west-1b
@@ -165,6 +171,49 @@ Resources:
       MaxSize: "4"
       MinSize: "1"
       NewInstancesProtectedFromScaleIn: true
+      
+  EFS:
+    Type: AWS::EFS::FileSystem
+    Properties: 
+      Encrypted: true
+      PerformanceMode: generalPurpose
+
+  AutoscalingMountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SubnetId: subnet-074559faefce7f792
+      SecurityGroups:
+        - !Ref AutoScalingSecurityGroup
+  
+  AutoscalingMountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SubnetId: subnet-050c3cc7e37d58444
+      SecurityGroups:
+        - !Ref AutoScalingSecurityGroup
+  
+  AutoscalingMountTarget3:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SubnetId: subnet-026b8575fca0c965a
+      SecurityGroups:
+        - !Ref AutoScalingSecurityGroup
+  
+  EFSAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref EFS
+      RootDirectory: 
+        RootDirectory FIND OUT ROOT DIRECTORY?
+
+
+
+
+
+      TODO Create 'EFS' and RDS resources, Installing LAMP, look into wordpress tutorial
 
     RDS:
       Type: AWS::RDS::DBInstance
