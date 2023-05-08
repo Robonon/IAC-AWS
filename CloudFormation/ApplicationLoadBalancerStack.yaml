@@ -214,3 +214,9 @@ Resources:
 
 
       TODO Create 'EFS' and RDS resources, Installing LAMP, look into wordpress tutorial
+
+      
+      
+/var/www/html
+
+      install php on EFS
