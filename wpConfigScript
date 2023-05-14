@@ -46,12 +46,12 @@ find /var/www -type f -exec sudo chmod 0644 {} \;
 wget https://wordpress.org/latest.tar.gz
 tar -xzf latest.tar.gz
 cp -r wordpress/* /var/www/html/
-#cp wordpress/wp-config-sample.php wordpress/wp-config.php
-#nano wordpress/wp-config.php
+cp wordpress/wp-config-sample.php wordpress/wp-config.php
+nano wordpress/wp-config.php
 #ToDo: Set database name, user and password
-# sed -i 's/database_name_here/wordpress-db/g' wordpress/wp-config.php
-# sed -i 's/username_here/wordpress-user/g' wordpress/wp-config.php
-# sed -i 's/password_here/your_strong_password/g' wordpress/wp-config.php
+sed -i 's/$DATABASE/wordpress-db/g' wordpress/wp-config.php
+sed -i 's/$USER/wordpress-user/g' wordpress/wp-config.php
+sed -i 's/$PASSWORD/g' wordpress/wp-config.php
 #ToDo: Salts
 wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /tmp/wp-cli.phar
 chmod +x /tmp/wp-cli.phar 
