@@ -84,11 +84,7 @@ Resources:
 
   AutoScalingTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      HealthCheckEnabled: true
-      HealthCheckIntervalSeconds: 30
-      HealthCheckPath: /health-check
-      HealthCheckProtocol: HTTP
+    Properties: 
       Port: 80
       Protocol: HTTP
       TargetType: instance
@@ -125,7 +121,7 @@ Resources:
         - AutoscalingMountTarget2
         - AutoscalingMountTarget3
       Properties:
-        KeyName: DemoKey
+        KeyName: HomeDesktopKey
         ImageId: ami-04f1014c8adcfa670
         InstanceType: t2.micro
         SecurityGroupIds:
@@ -136,49 +132,50 @@ Resources:
             dnf update -y
             dnf install -y wget
             dnf install -y mariadb105-server
-
+            dnf install -y amazon-efs-utils
             dnf install -y php-mysqlnd php-fpm php-mysqli php-json php php-devel php-gd
-            
+
+            systemctl start mariadb
+            systemctl enable mariadb
+
             mount -t efs -o tls ${EFS}:/ /var/www/html
 
-            USER="admin"
-            PASSWORD="qwerty123"
-            DATABASE="wordpressDB
+            export USER=admin
+            export PASSWORD=qwerty123
+            export DATABASE=wordpressDB
 
-            mysql -u root <<EOF
-            CREATE USER '$USER'@'localhost' IDENTIFIED BY '$PASSWORD';
-            CREATE DATABASE \`$DATABASE\`;
-            GRANT ALL PRIVILEGES ON \`$DATABASE\`.* TO "$USER"@"localhost";
-            FLUSH PRIVILEGES;
-            EOF
-
-            sed -i 's/$DATABASE/wordpress-db/g' wordpress/wp-config.php
-            sed -i 's/$USER/wordpress-user/g' wordpress/wp-config.php
-            sed -i 's/$PASSWORD/g' wordpress/wp-config.php
-
-            chown -R apache /var/www
-            chgrp -R apache /var/www
-            chmod 2775 /var/www
-            find /var/www -type d -exec sudo chmod 2775 {} \;
-            find /var/www -type f -exec sudo chmod 0644 {} \;
+            # mysql -u root <<EOF
+            # CREATE USER '$USER'@'localhost' IDENTIFIED BY '$PASSWORD';
+            # CREATE DATABASE \`$DATABASE\`;
+            # GRANT ALL PRIVILEGES ON \`$DATABASE\`.* TO "$USER"@"localhost";
+            # FLUSH PRIVILEGES;
+            # EOF
 
             wget https://wordpress.org/latest.tar.gz
             tar -xzf latest.tar.gz
-            cp -r wordpress/* /var/www/html/
+            
+            # cp /wordpress/wp-config-sample.php /wordpress/wp-config.php
+
+            # sed -i "s/database_name_here/$DATABASE/g" /wordpress/wp-config.php
+            # sed -i "s/username_here/$USER/g" /wordpress/wp-config.php
+            # sed -i "s/password_here/$PASSWORD/g" /wordpress/wp-config.php
+            # sed -i "s/localhost/!GetAtt RDS.Endpoint.Address/g" /wordpress/wp-config.php
 
             wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /tmp/wp-cli.phar 
             chmod +x /tmp/wp-cli.phar 
-            /tmp/wp-cli.phar config create --dbname=wordpressDB --dbuser=admin --dbpass=qwerty123 --path=/var/www/html --dbhost=!GetAtt RDS.Endpoint.Address
+            /tmp/wp-cli.phar config create --dbname=$DATABASE --dbuser=$USER --dbpass=$PASSWORD --path=/var/www/html --dbhost=!GetAtt RDS.Endpoint.Address
 
             DNS=!GettAtt RDS.DNSName
-            /tmp/wp-cli.phar core install --url=$DNS --title=Example --admin_user=admin --admin_password=qwerty123 --admin_email=info@example.com --path=/var/www/html
+            /tmp/wp-cli.phar core install --url=$DNS --title=RobinsHemsida --admin_user=$USER --admin_password=$PASSWORD --admin_email=info@example.com --path=/wordpress
+
+            cp -r -remove-destination /wordpress/* /var/www/html/
 
   LaunchTemplate:
     Type: 'AWS::EC2::LaunchTemplate'
     Properties:
       LaunchTemplateName: template-for-asg
       LaunchTemplateData:
-        KeyName: DemoKey
+        KeyName: HomeDesktopKey
         SecurityGroupIds:
           - !GetAtt AutoScalingSecurityGroup.GroupId
         ImageId: ami-04f1014c8adcfa670
@@ -188,13 +185,16 @@ Resources:
             #!/bin/bash
             dnf update -y
             dnf install -y httpd wget php-fpm php-mysqli php-json php php-devel
+            dnf install -y amazon-efs-utils
+
             systemctl start httpd
             systemctl enable httpd
+
             usermod -a -G apache ec2-user
             chown -R ec2-user:apache /var/www
             chmod 2775 /var/www && find /var/www -type d -exec sudo chmod 2775 {} \;
             find /var/www -type f -exec sudo chmod 0664 {} \;
-            yum install -y amazon-efs-utils
+            
             mount -t efs -o tls ${EFS}:/ /var/www/html
 
   AutoScalingGrp:
@@ -250,13 +250,6 @@ Resources:
       SubnetId: subnet-026b8575fca0c965a
       SecurityGroups:
         - !GetAtt EFSSecurityGroup.GroupId
-  
-  EFSAccessPoint:
-    Type: AWS::EFS::AccessPoint
-    Properties:
-      FileSystemId: !Ref EFS
-      RootDirectory: 
-        path: /var/www/html
 
   RDS:
     Type: AWS::RDS::DBInstance

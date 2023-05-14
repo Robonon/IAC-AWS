@@ -1,3 +1,0 @@
-#!/bin/bash
-
-aws cloudformation create-stack --stack-name ApplicationLoadBalancerStack --template-body file://CloudFormation/ApplicationLoadBalancerStack.yaml

@@ -10,7 +10,7 @@ systemctl enable mariadb
 systemctl start httpd
 systemctl enable httpd
 
-#mysql -u root -p
+# mysql -u root -p
 #ToDo: Create user and database
 # CREATE USER 'wordpress-user'@'localhost' IDENTIFIED BY 'your_strong_password';
 # CREATE DATABASE wordpress-db;
