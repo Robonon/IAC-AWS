@@ -1,0 +1,33 @@
+
+dnf update -y
+dnf install -y wget
+dnf install -y mariadb105-server
+
+dnf install -y php-mysqlnd php-fpm php-mysqli php-json php php-devel php-gd
+
+USER="admin"
+PASSWORD="qwerty123"
+DATABASE="wordpressDB
+
+mysql -u root <<EOF
+CREATE USER '$USER'@'localhost' IDENTIFIED BY '$PASSWORD';
+CREATE DATABASE \`$DATABASE\`;
+GRANT ALL PRIVILEGES ON \`$DATABASE\`.* TO "$USER"@"localhost";
+FLUSH PRIVILEGES;
+EOF
+
+chown -R apache /var/www
+chmod 2775 /var/www
+find /var/www -type d -exec sudo chmod 2775 {} \;
+find /var/www -type f -exec sudo chmod 0644 {} \;
+
+wget https://wordpress.org/latest.tar.gz
+tar -xzf latest.tar.gz
+cp -r wordpress/* /var/www/html/
+
+wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /tmp/wp-cli.phar 
+chmod +x /tmp/wp-cli.phar 
+/tmp/wp-cli.phar config create --dbname=wordpressDB --dbuser=admin --dbpass=qwerty123 --path=/var/www/html --dbhost=!GetAtt RDS.Endpoint.Address
+
+DNS=!GettAtt RDS.DNSName
+/tmp/wp-cli.phar core install --url=$DNS --title=Example --admin_user=admin --admin_password=qwerty123 --admin_email=info@example.com --path=/var/www/html

@@ -130,21 +130,61 @@ Resources:
         InstanceType: t2.micro
         SecurityGroupIds:
           - !GetAtt ProvisionSecurityGroup.GroupId
-        UserData: !Base64 |
-          #!/bin/bash -ex
-          # put your script here
+        UserData: 
+          Fn::Base64: !Sub |
+            #!/bin/bash -ex
+            dnf update -y
+            dnf install -y wget
+            dnf install -y mariadb105-server
+
+            dnf install -y php-mysqlnd php-fpm php-mysqli php-json php php-devel php-gd
+            
+            mount -t efs -o tls ${EFS}:/ /var/www/html
+
+            USER="admin"
+            PASSWORD="qwerty123"
+            DATABASE="wordpressDB
+
+            mysql -u root <<EOF
+            CREATE USER '$USER'@'localhost' IDENTIFIED BY '$PASSWORD';
+            CREATE DATABASE \`$DATABASE\`;
+            GRANT ALL PRIVILEGES ON \`$DATABASE\`.* TO "$USER"@"localhost";
+            FLUSH PRIVILEGES;
+            EOF
+
+            sed -i 's/$DATABASE/wordpress-db/g' wordpress/wp-config.php
+            sed -i 's/$USER/wordpress-user/g' wordpress/wp-config.php
+            sed -i 's/$PASSWORD/g' wordpress/wp-config.php
+
+            chown -R apache /var/www
+            chgrp -R apache /var/www
+            chmod 2775 /var/www
+            find /var/www -type d -exec sudo chmod 2775 {} \;
+            find /var/www -type f -exec sudo chmod 0644 {} \;
+
+            wget https://wordpress.org/latest.tar.gz
+            tar -xzf latest.tar.gz
+            cp -r wordpress/* /var/www/html/
+
+            wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /tmp/wp-cli.phar 
+            chmod +x /tmp/wp-cli.phar 
+            /tmp/wp-cli.phar config create --dbname=wordpressDB --dbuser=admin --dbpass=qwerty123 --path=/var/www/html --dbhost=!GetAtt RDS.Endpoint.Address
+
+            DNS=!GettAtt RDS.DNSName
+            /tmp/wp-cli.phar core install --url=$DNS --title=Example --admin_user=admin --admin_password=qwerty123 --admin_email=info@example.com --path=/var/www/html
 
   LaunchTemplate:
     Type: 'AWS::EC2::LaunchTemplate'
     Properties:
       LaunchTemplateName: template-for-asg
       LaunchTemplateData:
+        KeyName: DemoKey
         SecurityGroupIds:
           - !GetAtt AutoScalingSecurityGroup.GroupId
         ImageId: ami-04f1014c8adcfa670
         InstanceType: t2.micro
         UserData:
-          Fn::Base64: !Sub |
+          Fn::Base64: !Sub  |
             #!/bin/bash
             dnf update -y
             dnf install -y httpd wget php-fpm php-mysqli php-json php php-devel
@@ -154,10 +194,8 @@ Resources:
             chown -R ec2-user:apache /var/www
             chmod 2775 /var/www && find /var/www -type d -exec sudo chmod 2775 {} \;
             find /var/www -type f -exec sudo chmod 0664 {} \;
-            echo "<?php phpinfo(); ?>" > /var/www/html/phpinfo.php
             yum install -y amazon-efs-utils
-            mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport mount-target-DNS:/${!GetAtt EFS.IpAddress}~/efs-mount-point  
-
+            mount -t efs -o tls ${EFS}:/ /var/www/html
 
   AutoScalingGrp:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -195,7 +233,7 @@ Resources:
       FileSystemId: !Ref EFS
       SubnetId: subnet-074559faefce7f792
       SecurityGroups:
-        - !GetAtt AutoScalingSecurityGroup.GroupId
+        - !GetAtt EFSSecurityGroup.GroupId
   
   AutoscalingMountTarget2:
     Type: AWS::EFS::MountTarget
@@ -203,7 +241,7 @@ Resources:
       FileSystemId: !Ref EFS
       SubnetId: subnet-050c3cc7e37d58444
       SecurityGroups:
-        - !GetAtt AutoScalingSecurityGroup.GroupId
+        - !GetAtt EFSSecurityGroup.GroupId
   
   AutoscalingMountTarget3:
     Type: AWS::EFS::MountTarget
@@ -211,7 +249,7 @@ Resources:
       FileSystemId: !Ref EFS
       SubnetId: subnet-026b8575fca0c965a
       SecurityGroups:
-        - !GetAtt AutoScalingSecurityGroup.GroupId
+        - !GetAtt EFSSecurityGroup.GroupId
   
   EFSAccessPoint:
     Type: AWS::EFS::AccessPoint
