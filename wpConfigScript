@@ -76,3 +76,18 @@ DNS="!GetAtt RDS.DNSName"
 
 mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport mount-target-DNS:/fs-0bb03a116275f69c3.efs.eu-west-1.amazonaws.com >> /etc/fstab
 mount -a
+
+
+            # mysql -u root <<EOF
+            # CREATE USER '$USER'@'localhost' IDENTIFIED BY '$PASSWORD';
+            # CREATE DATABASE \`$DATABASE\`;
+            # GRANT ALL PRIVILEGES ON \`$DATABASE\`.* TO "$USER"@"localhost";
+            # FLUSH PRIVILEGES;
+            # EOF
+
+            # cp /wordpress/wp-config-sample.php /wordpress/wp-config.php
+
+            # sed -i "s/database_name_here/$DATABASE/g" /wordpress/wp-config.php
+            # sed -i "s/username_here/$USER/g" /wordpress/wp-config.php
+            # sed -i "s/password_here/$PASSWORD/g" /wordpress/wp-config.php
+            # sed -i "s/localhost/!GetAtt RDS.Endpoint.Address/g" /wordpress/wp-config.php

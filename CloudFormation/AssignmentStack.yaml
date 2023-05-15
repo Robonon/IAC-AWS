@@ -8,6 +8,21 @@ Parameters:
     Type: String
     Default: ALBSecGrp
 
+  USER:
+    Description: "Define user for wordpress and database"
+    Type: String
+    Default: admin
+
+  PASSWORD:
+    Description: "Define password for wordpress and database"
+    Type: String
+    Default: qwerty123
+  
+  DATABASE:
+    Description: "Define database name for wordpress"
+    Type: String
+    Default: wordpressDB
+
 Resources: 
 
   LoadBalancerSecurityGroup:
@@ -120,8 +135,9 @@ Resources:
         - AutoscalingMountTarget1
         - AutoscalingMountTarget2
         - AutoscalingMountTarget3
+        - EFS
       Properties:
-        KeyName: HomeDesktopKey
+        KeyName: DemoKey
         ImageId: ami-04f1014c8adcfa670
         InstanceType: t2.micro
         SecurityGroupIds:
@@ -139,43 +155,33 @@ Resources:
             systemctl enable mariadb
 
             mount -t efs -o tls ${EFS}:/ /var/www/html
+ 
+            USER=${USER}
+            PASSWORD=${PASSWORD}
+            DATABASE=${DATABASE}
 
-            export USER=admin
-            export PASSWORD=qwerty123
-            export DATABASE=wordpressDB
+            export USER
+            export PASSWORD
+            export DATABASE
 
-            # mysql -u root <<EOF
-            # CREATE USER '$USER'@'localhost' IDENTIFIED BY '$PASSWORD';
-            # CREATE DATABASE \`$DATABASE\`;
-            # GRANT ALL PRIVILEGES ON \`$DATABASE\`.* TO "$USER"@"localhost";
-            # FLUSH PRIVILEGES;
-            # EOF
-
-            wget https://wordpress.org/latest.tar.gz
-            tar -xzf latest.tar.gz
-            
-            # cp /wordpress/wp-config-sample.php /wordpress/wp-config.php
-
-            # sed -i "s/database_name_here/$DATABASE/g" /wordpress/wp-config.php
-            # sed -i "s/username_here/$USER/g" /wordpress/wp-config.php
-            # sed -i "s/password_here/$PASSWORD/g" /wordpress/wp-config.php
-            # sed -i "s/localhost/!GetAtt RDS.Endpoint.Address/g" /wordpress/wp-config.php
+            wget https://wordpress.org/latest.tar.gz -O /home/ec2-user/latest.tar.gz
+            tar -xzf /home/ec2-user/latest.tar.gz  
 
             wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /tmp/wp-cli.phar 
             chmod +x /tmp/wp-cli.phar 
-            /tmp/wp-cli.phar config create --dbname=$DATABASE --dbuser=$USER --dbpass=$PASSWORD --path=/var/www/html --dbhost=!GetAtt RDS.Endpoint.Address
+            /tmp/wp-cli.phar config create --dbname=$DATABASE --dbuser=$USER --dbpass=$PASSWORD --path=/wordpress --dbhost=${RDS.Endpoint.Address}
 
-            DNS=!GettAtt RDS.DNSName
-            /tmp/wp-cli.phar core install --url=$DNS --title=RobinsHemsida --admin_user=$USER --admin_password=$PASSWORD --admin_email=info@example.com --path=/wordpress
+            cp -r /wordpress/* /var/www/html
 
-            cp -r -remove-destination /wordpress/* /var/www/html/
+            DNS=${ApplicationLoadBalancer.DNSName}
+            /tmp/wp-cli.phar core install --url=$DNS --title=RobinsHemsida --admin_user=$USER --admin_password=$PASSWORD --admin_email=info@example.com --path=/var/www/html
 
   LaunchTemplate:
     Type: 'AWS::EC2::LaunchTemplate'
     Properties:
       LaunchTemplateName: template-for-asg
       LaunchTemplateData:
-        KeyName: HomeDesktopKey
+        KeyName: DemoKey
         SecurityGroupIds:
           - !GetAtt AutoScalingSecurityGroup.GroupId
         ImageId: ami-04f1014c8adcfa670
@@ -266,6 +272,4 @@ Resources:
       VPCSecurityGroups: 
         - !GetAtt RDSSecurityGroup.GroupId
 
-      # TODO Create 'EFS' and RDS resources, Installing LAMP, look into wordpress tutorial
-      # install php on EFS
-      # /temp bra att använda vid automation,
+      # TODO fix db and provision script 
